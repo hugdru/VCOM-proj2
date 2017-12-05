@@ -108,7 +108,7 @@ sc_env() {
     fi
     source "$ENV_FOLDER/bin/activate"
 
-    pip install --upgrade pip
+    1>&2 pip install --upgrade pip
 
     if [[ -d "$REQUIREMENTS_FOLDER" ]]; then
         log_message "Installing requirements"
