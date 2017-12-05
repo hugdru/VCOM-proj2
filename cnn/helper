@@ -6,16 +6,26 @@ CODE_FOLDER="$SCRIPT_DIR/cnn"
 TEST_FOLDER="$SCRIPT_DIR/test"
 REQUIREMENTS_FOLDER="$SCRIPT_DIR/requirements"
 
-requirements=(dev cpu)
-if [[ -n "$BUILD" ]]; then
-  IFS=' ' read -r -a requirements <<< "$BUILD"
+PYTHON_PATH="$(find /usr/bin/ -regex ".*/python\([0-9]\(\.[0-9]+\)*\)?$" | sort -r | head -n 1)"
+if [[ -z "$PYTHON_PATH" ]]; then
+  log_message "Python not found"
+  exit 1
 fi
-requirements=(common "${requirements[@]}")
+PYTHON="${PYTHON_PATH##*/}"
+PYTHON_VERSION="$("$PYTHON" --version | awk '{print $2}')"
+
+REQUIREMENTS=(dev cpu)
+if [[ -n "$BUILD" ]]; then
+  IFS=' ' read -r -a REQUIREMENTS <<< "$BUILD"
+fi
+REQUIREMENTS=(common "${REQUIREMENTS[@]}")
 
 main() {
   if [[ $# -lt 1 ]]; then
     usage bail
   fi
+
+  check_python_version
 
   local subcommand="$1"
   case "$subcommand" in
@@ -27,10 +37,26 @@ main() {
   esac
 }
 
+check_python_version() {
+  log_message "Selected python $PYTHON_VERSION to run the app"
+
+  IFS='.' read -r -a python_version_split <<< "$PYTHON_VERSION"
+
+  local major="${python_version_split[0]}"
+  local minor="${python_version_split[1]}"
+  local patch="${python_version_split[2]}"
+
+  if [[ "$major" -ne 3 ]]; then
+    log_message 'This code was only tested on python3'
+  elif [[ "$major" -eq 3 && "$minor" -lt 6 ]]; then
+    log_message 'Be advised, this code was only tested on python3.6!'
+  fi
+}
+
 sc_run() {
-  arguments=("$@")
-  arguments_len=$#
-  argument_separator_index=-1
+  local arguments=("$@")
+  local arguments_len=$#
+  local argument_separator_index=-1
   for index in "${!arguments[@]}"; do
     if [[ ${arguments[$index]} == "--" ]]; then
       argument_separator_index=$index
@@ -38,8 +64,8 @@ sc_run() {
     fi
   done
 
-  run_arguments=()
-  app_arguments=()
+  local run_arguments=()
+  local app_arguments=()
   if (( $argument_separator_index != -1 )); then
     run_arguments=("${arguments[@]::$argument_separator_index}")
     app_arguments=("${arguments[@]:$argument_separator_index+1:$arguments_len}")
@@ -47,9 +73,7 @@ sc_run() {
     run_arguments=("${arguments[@]::$arguments_len}")
   fi
 
-  check_python_version
-
-  env_arguments=()
+  local env_arguments=()
   for run_argument in "${run_arguments[@]}"; do
     case "$run_argument" in
       -f)
@@ -60,11 +84,10 @@ sc_run() {
 
   sc_env "${env_arguments[@]}"
 
-  python3 "$CODE_FOLDER/app.py" "${app_arguments[@]}"
+  python "$CODE_FOLDER/app.py" "${app_arguments[@]}"
 }
 
 sc_test() {
-  check_python_version
   sc_env
   python -m unittest discover -s "$TEST_FOLDER" -p "test_*.py"
 }
@@ -77,12 +100,19 @@ sc_env() {
   fi
   if [[ ! -d "$ENV_FOLDER" ]]; then
     log_message "Creating env"
-    1>&2 python3 -m venv "$ENV_FOLDER"
-
+    1>&2 "$PYTHON" -m venv "$ENV_FOLDER"
+    if [[ $? -ne 0 ]]; then
+      log_message "Failed creating the environment"
+      rm -rf "$ENV_FOLDER"
+      exit 1
+    fi
     source "$ENV_FOLDER/bin/activate"
+
+    pip install --upgrade pip
+
     if [[ -d "$REQUIREMENTS_FOLDER" ]]; then
         log_message "Installing requirements"
-        for requirement in "${requirements[@]}"; do
+        for requirement in "${REQUIREMENTS[@]}"; do
           1>&2 pip install -r "$REQUIREMENTS_FOLDER/$requirement.txt"
         done
     else
@@ -98,38 +128,35 @@ usage() {
   local bail="$1"
 
   read -r -d '' usage_string <<EOF
-$0 (run|env [-f])
-\trun # runs the code
-\tenv [-f] # creates the environment
-\t\t-f \t# forces env recreation and installs the requirements
+[BUILD=""] $0 run [[-f] [-- ..app_arguments]] | env [-f]
+ run   # runs the code
+  -f              # forces env recreation and installs the requirements
+  --              # separates run arguments from app arguments
+  ..app_arguments # the arguments to pass to the app
+
+  default: only creates env if it does not exist does not pass arguments to the app
+
+
+ env   # creates the environment
+  -f              # forces env recreation and installs the requirements
+
+  default: only creates env if it does not exist
+
+
+ BUILD # environment variable to choose the requirements to install separated by spaces, files in requirements
+  common          # packages shared by all, it is added by default
+  cpu             # tensor flow cpu
+  gpu             # tensor flow gpu
+  dev             # packages required for development linters, testing, etc
+  ...             # check the requirements folder for the .txt files
+
+  default: BUILD="dev cpu"
 EOF
 
   log_message -e "$usage_string"
 
   if [[ ! -z "$bail" ]]; then
     exit 1
-  fi
-}
-
-check_python_version() {
-  if ! type python3 >/dev/null 2>&1; then
-    log_message 'Missing executable, python3 not found in $PATH'
-    exit 1
-  fi
-
-  local python_version="$(python3 --version | awk '{print $2}')"
-  IFS='.' read -r -a python_version_split <<< "$python_version"
-  log_message "You are running python $python_version"
-
-  local major="${python_version_split[0]}"
-  local minor="${python_version_split[1]}"
-  local patch="${python_version_split[2]}"
-
-  if [[ "$major" -lt 3 ]]; then
-    log_message 'This code only runs on python3'
-    exit 1
-  elif [[ "$major" -eq 3 && "$minor" -lt 6 ]]; then
-    log_message 'Be advised, this code was only tested on python3.6!'
   fi
 }
 
