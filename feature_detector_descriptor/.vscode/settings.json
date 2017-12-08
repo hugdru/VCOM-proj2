@@ -1,0 +1,12 @@
+{
+  "editor.formatOnSave": true,
+  "python.venvPath": "${workspaceRoot}/env/",
+  "python.pythonPath": "${workspaceRoot}/env/bin/python",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.formatting.formatOnSave": true,
+  "python.linting.lintOnTextChange": true,
+  "python.linting.lintOnSave": true,
+  "python.formatting.provider": "yapf"
+}
