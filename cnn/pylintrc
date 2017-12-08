@@ -1,0 +1,7 @@
+[TYPECHECK]
+
+ignored-modules = cv2
+
+[MESSAGES CONTROL]
+
+disable = C0111
