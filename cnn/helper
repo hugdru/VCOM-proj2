@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(readlink -f "${0%/*}")"
 ENV_FOLDER="$SCRIPT_DIR/env"
 CODE_FOLDER="$SCRIPT_DIR/cnn"
+MAIN_FILE="$CODE_FOLDER/cnn.py"
 TEST_FOLDER="$SCRIPT_DIR/test"
 REQUIREMENTS_FOLDER="$SCRIPT_DIR/requirements"
 
@@ -18,7 +19,7 @@ REQUIREMENTS=(dev cpu)
 if [[ -n "$BUILD" ]]; then
   IFS=' ' read -r -a REQUIREMENTS <<< "$BUILD"
 fi
-REQUIREMENTS=(common "${REQUIREMENTS[@]}")
+REQUIREMENTS=(common "${REQUIREMENTS[@]}" external)
 
 main() {
   if [[ $# -lt 1 ]]; then
@@ -84,7 +85,7 @@ sc_run() {
 
   sc_env "${env_arguments[@]}"
 
-  python "$CODE_FOLDER/app.py" "${app_arguments[@]}"
+  python "$MAIN_FILE" "${app_arguments[@]}"
 }
 
 sc_test() {
@@ -148,9 +149,10 @@ usage() {
   cpu             # tensor flow cpu
   gpu             # tensor flow gpu
   dev             # packages required for development linters, testing, etc
+  external        # dependencies on remote git repositories
   ...             # check the requirements folder for the .txt files
 
-  default: BUILD="dev cpu"
+  default: BUILD="dev cpu external"
 EOF
 
   log_message -e "$usage_string"
