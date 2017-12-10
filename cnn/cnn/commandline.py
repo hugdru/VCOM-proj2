@@ -17,7 +17,7 @@ def parse():
         '--dataset',
         metavar='dir',
         required=False,
-        default="AID",
+        default="../AID",
         type=str,
         dest="dataset_dirpath",
         help='Directory where the dataset is located')
