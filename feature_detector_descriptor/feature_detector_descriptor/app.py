@@ -1,11 +1,11 @@
-import computed_data
+from computed_data import create_computed_data
 import commandline
 
 
 def main():
 
-    histogram_data, dataset_dirpath = commandline.parse()
-    computed_data.build_computed_data_if_none(dataset_dirpath, histogram_data)
+    dataset_dirpath, computed_data_conf = commandline.parse()
+    create_computed_data(dataset_dirpath, computed_data_conf)
 
 
 if __name__ == "__main__":
