@@ -87,20 +87,21 @@ def _create_histogram_comparison_data(con):
             "image_type": Histogram.REFERENCE_IMAGE_TYPE
         })
 
-    testing_images_iter = Histogram.select_filtered_iter(
-        con, {
-            "image_type": Histogram.TESTING_IMAGE_TYPE
-        })
-
     for reference_image in reference_images_iter:
+
+        testing_images_iter = Histogram.select_filtered_iter(
+            con, {
+                "image_type": Histogram.TESTING_IMAGE_TYPE
+            })
+
         for testing_image in testing_images_iter:
-            comparison_results = HistogramComparison(
+            histogram_comparison = HistogramComparison(
                 reference_image.id_pk, testing_image.id_pk,
                 HistogramComparison.DISTANCE_METHOD,
                 cv.compareHist(reference_image.histogram_data,
                                testing_image.histogram_data,
                                HistogramComparison.DISTANCE_METHOD))
-            comparison_results.insert(con)
+            histogram_comparison.insert(con)
 
     con.commit()
 

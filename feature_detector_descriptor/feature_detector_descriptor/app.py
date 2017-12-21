@@ -1,4 +1,4 @@
-from computed_data import create_computed_data
+from computed_data import create_computed_data, Histogram
 import commandline
 
 
