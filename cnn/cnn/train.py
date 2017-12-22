@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+# This file has been changed from https://github.com/fizyr/keras-retinanet/blob/master/keras_retinanet/bin/train.py
+
 import argparse
 import os
 import sys
@@ -24,20 +26,13 @@ import keras.preprocessing.image
 from keras.utils import multi_gpu_model
 import tensorflow as tf
 
-# Allow relative imports when being executed as script.
-if __name__ == "__main__" and __package__ is None:
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-    import keras_retinanet.bin
-    __package__ = "keras_retinanet.bin"
-
-# Change these to absolute imports if you copy this script outside the keras_retinanet package.
-from .. import losses
-from .. import layers
-from ..callbacks import RedirectModel
-from ..preprocessing.pascal_voc import PascalVocGenerator
-from ..preprocessing.csv_generator import CSVGenerator
-from ..models.resnet import ResNet50RetinaNet
-from ..utils.keras_version import check_keras_version
+from keras_retinanet import losses
+from keras_retinanet import layers
+from keras_retinanet.callbacks import RedirectModel
+from keras_retinanet.preprocessing.pascal_voc import PascalVocGenerator
+from keras_retinanet.preprocessing.csv_generator import CSVGenerator
+from keras_retinanet.models.resnet import ResNet50RetinaNet
+from keras_retinanet.utils.keras_version import check_keras_version
 
 
 def get_session():
@@ -98,7 +93,7 @@ def create_callbacks(model, training_model, prediction_model,
         callbacks.append(checkpoint)
 
     if args.dataset_type == 'coco' and args.evaluation:
-        from ..callbacks.coco import CocoEval
+        from keras_retinanet.callbacks.coco import CocoEval
 
         # use prediction model for evaluation
         evaluation = CocoEval(validation_generator)
@@ -127,7 +122,7 @@ def create_generators(args):
 
     if args.dataset_type == 'coco':
         # import here to prevent unnecessary dependency on cocoapi
-        from ..preprocessing.coco import CocoGenerator
+        from keras_retinanet.preprocessing.coco import CocoGenerator
 
         train_generator = CocoGenerator(
             args.coco_path,

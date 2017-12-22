@@ -1,2 +1,2 @@
 git+https://github.com/broadinstitute/keras-resnet@fc3e1209d0fa4cbf4eba65f6d1dcc655e1166371
-git+https://github.com/fizyr/keras-retinanet@a5370e1fef4b774b61bb9125a5a0f0b8ac074e23
+git+https://github.com/fizyr/keras-retinanet@79a442e62e7f362def00689545682a2fecfe5175
