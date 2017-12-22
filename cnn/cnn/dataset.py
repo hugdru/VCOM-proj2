@@ -1,6 +1,7 @@
 import csv
 import os
 import sys
+from PIL import Image
 
 LEARNING_ANOTATIONS_FILENAME = "learning_anotations.csv"
 LEARNING_CLASS_FILENAME = "learning_class.csv"
@@ -38,14 +39,18 @@ def build_csvs_if_none(dataset_dirpath, csv_data):
                     continue
                 category = os.path.basename(root).lower()
                 learning_class_writer.writerow([category, category_id])
-                for learning_annotations_elements, f in enumerate(files):
-                    if learning_annotations_elements < csv_data.annotations_per_category:
-                        learning_annotations_writer.writerow(
-                            [os.path.join(root, f), "", "", "", "", category])
-                        learning_annotations_elements += 1
+                for i, fn in enumerate(files):
+                    fp = os.path.join(root, fn)
+                    image_info = Image.open(fp)
+                    image_width, image_height = image_info.size
+                    if i < csv_data.annotations_per_category:
+                        learning_annotations_writer.writerow([
+                            fp, 0, 0, image_height - 1, image_width - 1,
+                            category
+                        ])
+                        i += 1
                     else:
-                        testing_writer.writerow(
-                            [os.path.join(root, f), category])
+                        testing_writer.writerow([fp, category])
                 category_id += 1
     else:
         print("csv data files present skipping...", file=sys.stderr)
