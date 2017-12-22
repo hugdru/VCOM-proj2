@@ -1,9 +1,12 @@
 import os
 import sqlite3
 import pickle
+import csv
 import cv2 as cv
 
 _COMPUTED_DATA_FILENAME = "computed_data.sqlite3"
+_COMPARISON_RESULTS_FILENAME = "comparison_results.csv"
+_SUMMARY_RESULTS_FILENAME = "summary_results.csv"
 
 
 def create_computed_data(dataset_dirpath,
@@ -28,6 +31,68 @@ def create_computed_data(dataset_dirpath,
     _create_tables(con)
     _create_histogram_data(con, dataset_dirpath, computed_data_conf)
     _create_histogram_comparison_data(con)
+
+
+def create_results_from_computed_data(con,
+                                      computed_data_conf,
+                                      rebuild_if_exists=False):
+
+    comparison_results_filepath = os.path.join(computed_data_conf.dirpath,
+                                               _COMPARISON_RESULTS_FILENAME)
+
+    summary_results_filepath = os.path.join(computed_data_conf.dirpath,
+                                            _SUMMARY_RESULTS_FILENAME)
+
+    exists_comparison_results = os.path.isfile(comparison_results_filepath)
+    exists_summary_results = os.path.isfile(summary_results_filepath)
+
+    if exists_comparison_results and exists_summary_results and not rebuild_if_exists:
+        return
+
+    cursor = con.cursor()
+    try:
+        query = """
+SELECT o.reference_image_id, o.testing_image_id, hr.label AS reference_image_label, ht.label AS testing_image_label 
+FROM (SELECT l.reference_image_id, l.testing_image_id
+FROM histogram_comparison l
+LEFT OUTER JOIN histogram_comparison r
+  ON
+    l.testing_image_id = r.testing_image_id AND
+    l.distance > r.distance
+WHERE r.testing_image_id IS NULL) o
+INNER JOIN histogram hr ON hr.id = o.reference_image_id
+INNER JOIN histogram ht ON ht.id = o.testing_image_id"""
+
+        with open(comparison_results_filepath,
+                  "w") as comparison_results_file, open(
+                      summary_results_filepath, "w") as summary_results_file:
+            comparison_results_writer = csv.writer(comparison_results_file)
+            comparison_results_writer.writerow([
+                "reference_image_id", "testing_image_id",
+                "reference_image_label", "testing_image_label"
+            ])
+
+            summary_results_writer = csv.writer(summary_results_file)
+
+            matches = 0
+            total = 0
+
+            for row in cursor.execute(query):
+                if row["reference_image_label"] == row["testing_image_label"]:
+                    matches += 1
+
+                comparison_results_writer.writerow([
+                    row["reference_image_id"], row["testing_image_id"],
+                    row["reference_image_label"], row["testing_image_label"]
+                ])
+
+                total += 1
+
+            summary_results_writer.writerow(
+                ["match percentage", matches / total])
+
+    finally:
+        cursor.close()
 
 
 def _create_sqlite3_file(filepath, remove_if_exists=False):
@@ -160,7 +225,7 @@ class Histogram():
     def select_filtered_iter(cls, con, where_filter):
         cursor = con.cursor()
         try:
-            where_str, values = build_where_str_from_filter(where_filter)
+            where_str, values = _build_where_str_from_filter(where_filter)
             if not where_str:
                 return False
 
@@ -207,6 +272,10 @@ FOREIGN KEY (testing_image_id) REFERENCES {1} (id),
 PRIMARY KEY (reference_image_id, testing_image_id, distance_method))""".format(
             cls.TABLE_NAME, Histogram.TABLE_NAME))
 
+        con.execute(
+            "CREATE INDEX {0}_statistics_idx ON {0}(testing_image_id, distance, reference_image_id)".
+            format(cls.TABLE_NAME))
+
     def insert(self, con):
         con.execute(
             "INSERT INTO {}(reference_image_id, testing_image_id, distance_method, distance) VALUES (?, ?, ?, ?)".
@@ -216,7 +285,7 @@ PRIMARY KEY (reference_image_id, testing_image_id, distance_method))""".format(
             ])
 
 
-def build_where_str_from_filter(where_filter):
+def _build_where_str_from_filter(where_filter):
 
     if not where_filter:
         return None, None
