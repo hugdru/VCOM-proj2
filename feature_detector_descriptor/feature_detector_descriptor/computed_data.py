@@ -51,17 +51,27 @@ def create_results_from_computed_data(con,
 
     cursor = con.cursor()
     try:
+        # The outer group by is used to pick just one
+        # reference image per testing image, min(o.reference_image_id).
+        # Another aggregate function could be used. Leading to different
+        # matching percentages. Maybe a random one would be interesting.
+        # This can happen because there might be reference_image_ids
+        # or distance_methods with the same testing_image_id and distance.
         query = """
-SELECT o.reference_image_id, o.testing_image_id, hr.label AS reference_image_label, ht.label AS testing_image_label 
-FROM (SELECT l.reference_image_id, l.testing_image_id
-FROM histogram_comparison l
-LEFT OUTER JOIN histogram_comparison r
+SELECT cr.reference_image_id, cr.testing_image_id, hr.label AS reference_image_label, ht.label AS testing_image_label
+FROM (
+  SELECT MIN(o.reference_image_id) AS reference_image_id, i.testing_image_id
+  FROM histogram_comparison o
+  INNER JOIN (
+    SELECT testing_image_id, MIN(distance) AS distance
+    FROM histogram_comparison
+    GROUP BY testing_image_id) i
   ON
-    l.testing_image_id = r.testing_image_id AND
-    l.distance > r.distance
-WHERE r.testing_image_id IS NULL) o
-INNER JOIN histogram hr ON hr.id = o.reference_image_id
-INNER JOIN histogram ht ON ht.id = o.testing_image_id"""
+    o.testing_image_id = i.testing_image_id AND
+    o.distance = i.distance
+  GROUP BY i.testing_image_id) cr
+INNER JOIN histogram hr ON hr.id = cr.reference_image_id
+INNER JOIN histogram ht ON ht.id = cr.testing_image_id"""
 
         with open(comparison_results_filepath,
                   "w") as comparison_results_file, open(
@@ -89,7 +99,7 @@ INNER JOIN histogram ht ON ht.id = o.testing_image_id"""
                 total += 1
 
             summary_results_writer.writerow(
-                ["match percentage", matches / total])
+                ["match percentage", matches / total * 100])
 
     finally:
         cursor.close()
