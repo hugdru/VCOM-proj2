@@ -145,12 +145,10 @@ usage() {
 
  BUILD # environment variable to choose the requirements to install separated by spaces, files in requirements
   common          # packages shared by all, it is added by default
-  cpu             # tensor flow cpu
-  gpu             # tensor flow gpu
   dev             # packages required for development linters, testing, etc
   ...             # check the requirements folder for the .txt files
 
-  default: BUILD="dev cpu"
+  default: BUILD="dev"
 EOF
 
   log_message -e "$usage_string"

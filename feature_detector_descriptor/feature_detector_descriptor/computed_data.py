@@ -32,6 +32,8 @@ def create_computed_data(dataset_dirpath,
     _create_histogram_data(con, dataset_dirpath, computed_data_conf)
     _create_histogram_comparison_data(con)
 
+    return con
+
 
 def create_results_from_computed_data(con,
                                       computed_data_conf,
