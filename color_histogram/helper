@@ -2,7 +2,7 @@
 
 SCRIPT_DIR="$(readlink -f "${0%/*}")"
 ENV_FOLDER="$SCRIPT_DIR/env"
-CODE_FOLDER="$SCRIPT_DIR/feature_detector_descriptor"
+CODE_FOLDER="$SCRIPT_DIR/color_histogram"
 TEST_FOLDER="$SCRIPT_DIR/test"
 REQUIREMENTS_FOLDER="$SCRIPT_DIR/requirements"
 
