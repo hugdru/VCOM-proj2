@@ -2,14 +2,15 @@ import argparse
 
 
 class ComputedDataConf():
-    def __init__(self, dirpath, nimages_comparison):
+    def __init__(self, dirpath, nimages_comparison, rebuild_if_exists):
         self.dirpath = dirpath
         self.nimages_comparison = nimages_comparison
+        self.rebuild_if_exists = rebuild_if_exists
 
 
 def parse():
     parser = argparse.ArgumentParser(
-        description='A convolution neural network for Aerial scene recognition',
+        description='Color Histogram Comparison for Aerial scene recognition',
         formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument(
@@ -46,7 +47,27 @@ def parse():
         'The number of images per category that will serve as a reference for histogram comparison'
     )
 
+    parser.add_argument(
+        '-ri',
+        '--recognize-images',
+        metavar='file',
+        required=False,
+        type=str,
+        nargs='+',
+        dest='images_paths_to_recognize',
+        help='External images to be recognized')
+
+    parser.add_argument(
+        "-f",
+        "--force",
+        required=False,
+        default=False,
+        action='store_true',
+        dest="rebuild_if_exists",
+        help="force reconstruction of computed_data")
+
     args = parser.parse_args()
 
     return args.dataset_dirpath, ComputedDataConf(
-        args.computed_data_dirpath, args.computed_data_nimages_comparison)
+        args.computed_data_dirpath, args.computed_data_nimages_comparison,
+        args.rebuild_if_exists), args.images_paths_to_recognize

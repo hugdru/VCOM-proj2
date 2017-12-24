@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(readlink -f "${0%/*}")"
 ENV_FOLDER="$SCRIPT_DIR/env"
 CODE_FOLDER="$SCRIPT_DIR/color_histogram"
+MAIN_FILE="$CODE_FOLDER/app.py"
 TEST_FOLDER="$SCRIPT_DIR/test"
 REQUIREMENTS_FOLDER="$SCRIPT_DIR/requirements"
 
@@ -19,6 +20,18 @@ if [[ -n "$BUILD" ]]; then
   IFS=' ' read -r -a REQUIREMENTS <<< "$BUILD"
 fi
 REQUIREMENTS=(common "${REQUIREMENTS[@]}")
+
+# _.* variables are used for function returns.
+# Bash does not have "typical" return values only return codes
+# Echo and then capture would be a mess too. 
+# Starting to feel hacky and sloppy.
+# Python or some other language warranted.
+#
+# Used in args_separator()
+_SB_ARGS_ARRAY=
+_APP_ARGS_ARRAY=
+# Used in env_args()
+_ENV_ARGS_ARRAY=
 
 main() {
   if [[ $# -lt 1 ]]; then
@@ -53,7 +66,10 @@ check_python_version() {
   fi
 }
 
-sc_run() {
+args_separator() {
+  _SB_ARGS_ARRAY=
+  _APP_ARGS_ARRAY=
+
   local arguments=("$@")
   local arguments_len=$#
   local argument_separator_index=-1
@@ -64,27 +80,41 @@ sc_run() {
     fi
   done
 
-  local run_arguments=()
+  local sb_arguments=()
   local app_arguments=()
   if (( $argument_separator_index != -1 )); then
-    run_arguments=("${arguments[@]::$argument_separator_index}")
+    sb_arguments=("${arguments[@]::$argument_separator_index}")
     app_arguments=("${arguments[@]:$argument_separator_index+1:$arguments_len}")
   else
-    run_arguments=("${arguments[@]::$arguments_len}")
+    sb_arguments=("${arguments[@]::$arguments_len}")
   fi
 
+  _SB_ARGS_ARRAY=("${sb_arguments[@]}")
+  _APP_ARGS_ARRAY=("${app_arguments[@]}")
+}
+
+env_args() {
+  _ENV_ARGS_ARRAY=
+
+  local sb_arguments=("$@")
+
   local env_arguments=()
-  for run_argument in "${run_arguments[@]}"; do
-    case "$run_argument" in
+  for sb_argument in "${sb_arguments[@]}"; do
+    case "$sb_argument" in
       -f)
-        env_arguments+=("$run_argument")
+        env_arguments+=("$sb_argument")
         ;;
     esac
   done
 
-  sc_env "${env_arguments[@]}"
+  _ENV_ARGS_ARRAY=("${env_arguments[@]}")
+}
 
-  python "$CODE_FOLDER/app.py" "${app_arguments[@]}"
+sc_run() {
+  args_separator "$@"
+  env_args "${_SB_ARGS_ARRAY[@]}"
+  sc_env "${_ENV_ARGS_ARRAY[@]}"
+  python "$MAIN_FILE" "${_APP_ARGS_ARRAY[@]}"
 }
 
 sc_test() {

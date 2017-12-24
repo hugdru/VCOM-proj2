@@ -9,12 +9,7 @@ _COMPARISON_RESULTS_FILENAME = "comparison_results.csv"
 _SUMMARY_RESULTS_FILENAME = "summary_results.csv"
 
 
-def create_computed_data(dataset_dirpath,
-                         computed_data_conf,
-                         rebuild_if_exists=False):
-
-    if not os.path.isdir(dataset_dirpath):
-        raise Exception(f"{dataset_dirpath} is not a directory")
+def create_computed_data(dataset_dirpath, computed_data_conf):
 
     os.makedirs(computed_data_conf.dirpath, exist_ok=True)
 
@@ -23,8 +18,11 @@ def create_computed_data(dataset_dirpath,
 
     exists_computed_data = os.path.isfile(computed_data_filepath)
 
-    if exists_computed_data and not rebuild_if_exists:
+    if exists_computed_data and not computed_data_conf.rebuild_if_exists:
         return _create_sqlite3_file(computed_data_filepath)
+
+    if not os.path.isdir(dataset_dirpath):
+        raise Exception(f"{dataset_dirpath} is not a directory")
 
     con = _create_sqlite3_file(computed_data_filepath, remove_if_exists=True)
 
@@ -35,9 +33,7 @@ def create_computed_data(dataset_dirpath,
     return con
 
 
-def create_results_from_computed_data(con,
-                                      computed_data_conf,
-                                      rebuild_if_exists=False):
+def create_results_from_computed_data(con, computed_data_conf):
 
     comparison_results_filepath = os.path.join(computed_data_conf.dirpath,
                                                _COMPARISON_RESULTS_FILENAME)
@@ -48,7 +44,7 @@ def create_results_from_computed_data(con,
     exists_comparison_results = os.path.isfile(comparison_results_filepath)
     exists_summary_results = os.path.isfile(summary_results_filepath)
 
-    if exists_comparison_results and exists_summary_results and not rebuild_if_exists:
+    if exists_comparison_results and exists_summary_results and not computed_data_conf.rebuild_if_exists:
         return
 
     cursor = con.cursor()
@@ -107,6 +103,30 @@ INNER JOIN histogram ht ON ht.id = cr.testing_image_id"""
         cursor.close()
 
 
+def recognize_images(con, images_paths_to_recognize):
+    if not images_paths_to_recognize:
+        return
+
+    for image_path_to_recognize in images_paths_to_recognize:
+        image_histogram_to_recognize = _create_image_histogram(
+            cv.imread(image_path_to_recognize))
+
+        selected_reference_image = None
+        selected_distance = None
+        for reference_image in Histogram.select_reference_type(con):
+            distance = _compare_histograms(reference_image.histogram_data,
+                                           image_histogram_to_recognize)
+            if not selected_distance or selected_distance > distance:
+                selected_reference_image = reference_image
+                selected_distance = distance
+
+        if selected_reference_image:
+            print("{} is a {}".format(image_path_to_recognize,
+                                      selected_reference_image.label))
+        else:
+            raise Exception("No reference images present in the database")
+
+
 def _create_sqlite3_file(filepath, remove_if_exists=False):
 
     if remove_if_exists:
@@ -133,54 +153,53 @@ def _create_histogram_data(con, dataset_dirpath, computed_data_conf):
                 root):
             continue
         label = os.path.basename(root).lower()
-        for f_index, f in enumerate(files):
+        for f_index, partial_fpath in enumerate(files):
             if f_index < computed_data_conf.nimages_comparison:
                 image_type = Histogram.REFERENCE_IMAGE_TYPE
             else:
                 image_type = Histogram.TESTING_IMAGE_TYPE
 
-            image_path = os.path.join(root, f)
-            image = cv.imread(image_path)
-            bucket_size = 32
-            histogram_data = cv.calcHist([image], [0, 1, 2], None,
-                                         [bucket_size] * 3,
-                                         [0, 256, 0, 256, 0, 256])
+            image_path = os.path.join(root, partial_fpath)
 
-            computed_histogram = Histogram(
-                image_path=image_path,
-                label=label,
-                histogram_data=histogram_data,
-                bucket_size=bucket_size,
-                image_type=image_type)
+            computed_histogram = Histogram.build_load_image(
+                image_path=image_path, label=label, image_type=image_type)
 
             computed_histogram.insert(con)
     con.commit()
 
 
+def _create_image_histogram(image):
+    bucket_size = 32
+    return cv.calcHist([image], [0, 1, 2], None, [bucket_size] * 3,
+                       [0, 256, 0, 256, 0, 256])
+
+
 def _create_histogram_comparison_data(con):
 
-    reference_images_iter = Histogram.select_filtered_iter(
-        con, {
-            "image_type": Histogram.REFERENCE_IMAGE_TYPE
-        })
+    reference_images_iter = Histogram.select_reference_type(con)
 
     for reference_image in reference_images_iter:
 
-        testing_images_iter = Histogram.select_filtered_iter(
-            con, {
-                "image_type": Histogram.TESTING_IMAGE_TYPE
-            })
+        testing_images_iter = Histogram.select_testing_type(con)
 
         for testing_image in testing_images_iter:
+            distance_method, distance = _compare_histograms(
+                reference_image.histogram_data, testing_image.histogram_data)
+
             histogram_comparison = HistogramComparison(
-                reference_image.id_pk, testing_image.id_pk,
-                HistogramComparison.DISTANCE_METHOD,
-                cv.compareHist(reference_image.histogram_data,
-                               testing_image.histogram_data,
-                               HistogramComparison.DISTANCE_METHOD))
+                reference_image_id=reference_image.id_pk,
+                testing_image_id=testing_image.id_pk,
+                distance_method=distance_method,
+                distance=distance)
             histogram_comparison.insert(con)
 
     con.commit()
+
+
+def _compare_histograms(reference_image_histogram, testing_image_histogram):
+    return HistogramComparison.DISTANCE_METHOD, cv.compareHist(
+        reference_image_histogram, testing_image_histogram,
+        HistogramComparison.DISTANCE_METHOD)
 
 
 class Histogram():
@@ -193,21 +212,27 @@ class Histogram():
                  image_path,
                  label,
                  histogram_data,
-                 bucket_size,
                  image_type,
                  id_pk=None):
         self.image_path = image_path
         self.label = label
         self.histogram_data = histogram_data
-        self.bucket_size = bucket_size
         self.image_type = image_type
         self.id_pk = id_pk
 
+    @classmethod
+    def build_load_image(cls, image_path, label, image_type):
+        return cls(
+            image_path=image_path,
+            label=label,
+            histogram_data=_create_image_histogram(cv.imread(image_path)),
+            image_type=image_type)
+
     def insert(self, con):
         con.execute(
-            "INSERT INTO {}(image_path, label, bucket_size, histogram_data, image_type) VALUES (?, ?, ?, ?, ?)".
+            "INSERT INTO {}(image_path, label, histogram_data, image_type) VALUES (?, ?, ?, ?)".
             format(self.TABLE_NAME), [
-                self.image_path, self.label, self.bucket_size,
+                self.image_path, self.label,
                 pickle.dumps(self.histogram_data), self.image_type
             ])
 
@@ -218,7 +243,6 @@ class Histogram():
             image_path=row["image_path"],
             label=row["label"],
             histogram_data=pickle.loads(row["histogram_data"]),
-            bucket_size=row["bucket_size"],
             image_type=row["image_type"])
 
     @classmethod
@@ -250,9 +274,23 @@ class Histogram():
         return True
 
     @classmethod
+    def select_reference_type(cls, con):
+        return Histogram.select_filtered_iter(
+            con, {
+                "image_type": Histogram.REFERENCE_IMAGE_TYPE
+            })
+
+    @classmethod
+    def select_testing_type(cls, con):
+        return Histogram.select_filtered_iter(
+            con, {
+                "image_type": Histogram.TESTING_IMAGE_TYPE
+            })
+
+    @classmethod
     def create_table(cls, con):
         con.execute(
-            "CREATE TABLE {} (id INTEGER PRIMARY KEY AUTOINCREMENT, image_path TEXT UNIQUE NOT NULL, label TEXT NOT NULL, bucket_size INTEGER NOT NULL, histogram_data BLOB NOT NULL, image_type INTEGER NOT NULL)".
+            "CREATE TABLE {} (id INTEGER PRIMARY KEY AUTOINCREMENT, image_path TEXT UNIQUE NOT NULL, label TEXT NOT NULL, histogram_data BLOB NOT NULL, image_type INTEGER NOT NULL)".
             format(cls.TABLE_NAME))
 
         con.execute(
