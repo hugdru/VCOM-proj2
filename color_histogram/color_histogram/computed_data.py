@@ -9,7 +9,7 @@ _COMPARISON_RESULTS_FILENAME = "comparison_results.csv"
 _SUMMARY_RESULTS_FILENAME = "summary_results.csv"
 
 
-def create_computed_data(dataset_dirpath, computed_data_conf):
+def create_computed_data(dataset_conf, computed_data_conf):
 
     os.makedirs(computed_data_conf.dirpath, exist_ok=True)
 
@@ -21,13 +21,14 @@ def create_computed_data(dataset_dirpath, computed_data_conf):
     if exists_computed_data and not computed_data_conf.rebuild_if_exists:
         return _create_sqlite3_file(computed_data_filepath)
 
-    if not os.path.isdir(dataset_dirpath):
-        raise Exception(f"{dataset_dirpath} is not a directory")
+    if not (os.path.isfile(dataset_conf.train_csv_filepath)
+            and os.path.isfile(dataset_conf.test_csv_filepath)):
+        raise Exception(f"dataset csvs do not exist")
 
     con = _create_sqlite3_file(computed_data_filepath, remove_if_exists=True)
 
     _create_tables(con)
-    _create_histogram_data(con, dataset_dirpath, computed_data_conf)
+    _create_histogram_data(con, dataset_conf)
     _create_histogram_comparison_data(con)
 
     return con
@@ -146,26 +147,22 @@ def _create_tables(con):
     con.commit()
 
 
-def _create_histogram_data(con, dataset_dirpath, computed_data_conf):
+def _create_histogram_data(con, dataset_conf):
 
-    for root, _, files in os.walk(dataset_dirpath):
-        if not files or os.path.normpath(dataset_dirpath) == os.path.normpath(
-                root):
-            continue
-        label = os.path.basename(root).lower()
-        for f_index, partial_fpath in enumerate(files):
-            if f_index < computed_data_conf.nimages_comparison:
-                image_type = Histogram.REFERENCE_IMAGE_TYPE
-            else:
-                image_type = Histogram.TESTING_IMAGE_TYPE
+    train_iterator = _read_csv(dataset_conf.train_csv_filepath)
+    test_iterator = _read_csv(dataset_conf.test_csv_filepath)
 
-            image_path = os.path.join(root, partial_fpath)
+    _compute_insert_images(con, train_iterator, Histogram.REFERENCE_IMAGE_TYPE)
+    _compute_insert_images(con, test_iterator, Histogram.TESTING_IMAGE_TYPE)
 
-            computed_histogram = Histogram.build_load_image(
-                image_path=image_path, label=label, image_type=image_type)
-
-            computed_histogram.insert(con)
     con.commit()
+
+
+def _compute_insert_images(con, images_paths, image_type):
+    for image_path, image_label in images_paths:
+        computed_histogram = Histogram.build_load_image(
+            image_path=image_path, label=image_label, image_type=image_type)
+        computed_histogram.insert(con)
 
 
 def _create_image_histogram(image):
@@ -355,3 +352,10 @@ def _build_where_str_from_filter(where_filter):
         values.append(value)
 
     return where_str, tuple(values)
+
+
+def _read_csv(csv_filepath):
+    with open(csv_filepath, newline='') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        for row in csv_reader:
+            yield row[0], row[1]

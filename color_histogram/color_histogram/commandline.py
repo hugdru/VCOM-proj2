@@ -2,10 +2,15 @@ import argparse
 
 
 class ComputedDataConf():
-    def __init__(self, dirpath, nimages_comparison, rebuild_if_exists):
+    def __init__(self, dirpath, rebuild_if_exists):
         self.dirpath = dirpath
-        self.nimages_comparison = nimages_comparison
         self.rebuild_if_exists = rebuild_if_exists
+
+
+class DatasetConf():
+    def __init__(self, train_csv_filepath, test_csv_filepath):
+        self.train_csv_filepath = train_csv_filepath
+        self.test_csv_filepath = test_csv_filepath
 
 
 def parse():
@@ -14,14 +19,14 @@ def parse():
         formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument(
-        '-d',
-        '--dataset',
-        metavar='dir',
+        '-dc',
+        '--dataset-csvs',
+        metavar='train_csv test_csv',
         required=False,
-        default="../AID",
-        type=str,
-        dest="dataset_dirpath",
-        help='Directory where the dataset is located')
+        default=["../AID_DIVISION/train.csv", "../AID_DIVISION/test.csv"],
+        type=_check_tuple_len(2),
+        dest="dataset_csvs",
+        help='Directory where the dataset csvs are located')
 
     parser.add_argument(
         '-cd',
@@ -33,18 +38,6 @@ def parse():
         dest='computed_data_dirpath',
         help=
         'Directory where to place the computed data: histograms, comparison values, statistics, etc.'
-    )
-
-    parser.add_argument(
-        '-cdn',
-        '--computed-data-nimages-comparison',
-        metavar='number',
-        default=200,
-        required=False,
-        type=int,
-        dest='computed_data_nimages_comparison',
-        help=
-        'The number of images per category that will serve as a reference for histogram comparison'
     )
 
     parser.add_argument(
@@ -68,6 +61,14 @@ def parse():
 
     args = parser.parse_args()
 
-    return args.dataset_dirpath, ComputedDataConf(
-        args.computed_data_dirpath, args.computed_data_nimages_comparison,
-        args.rebuild_if_exists), args.images_paths_to_recognize
+    return DatasetConf(
+        args.dataset_csvs[0], args.dataset_csvs[1]), ComputedDataConf(
+            args.computed_data_dirpath,
+            args.rebuild_if_exists), args.images_paths_to_recognize
+
+
+def _check_tuple_len(n):
+    def _(arr):
+        return len(arr) != n
+
+    return _
