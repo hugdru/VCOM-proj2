@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(readlink -f "${0%/*}")"
 ENV_FOLDER="$SCRIPT_DIR/env"
 CODE_FOLDER="$SCRIPT_DIR/cnn"
-CSV_MAIN_FILE="$CODE_FOLDER/csv.py"
+CSV_MAIN_FILE="$CODE_FOLDER/csv_parser.py"
 TRAIN_MAIN_FILE="$CODE_FOLDER/train.py"
 TEST_FOLDER="$SCRIPT_DIR/test"
 REQUIREMENTS_FOLDER="$SCRIPT_DIR/requirements"
@@ -43,7 +43,7 @@ main() {
 
   local subcommand="$1"
   case "$subcommand" in
-    csv|train|env|test)
+    csv_parser|train|env|test)
       sc_"$subcommand" "${@:2}"
       ;;
     *)
@@ -111,7 +111,7 @@ env_args() {
   _ENV_ARGS_ARRAY=("${env_arguments[@]}")
 }
 
-sc_csv() {
+sc_csv_parser() {
   sc_csv_train_common "$@"
   python "$CSV_MAIN_FILE" "${_APP_ARGS_ARRAY[@]}"
 }
@@ -168,7 +168,7 @@ usage() {
   local bail="$1"
 
   read -r -d '' usage_string <<EOF
-[BUILD=""] $0 csv [[-f] [-- ..app_arguments]] | train [[-f] [-- ..app_arguments]] | env [-f]
+[BUILD=""] $0 csv_parser [[-f] [-- ..app_arguments]] | train [[-f] [-- ..app_arguments]] | env [-f]
  csv   # generates the csv files for fizyr/keras-retinanet
   -f              # forces env recreation and installs the requirements
   --              # separates run arguments from app arguments

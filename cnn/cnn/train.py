@@ -152,7 +152,8 @@ def create_generators(args):
             args.annotations,
             args.classes,
             train_image_data_generator,
-            batch_size=args.batch_size)
+            batch_size=args.batch_size,
+            base_dir="./")
 
         if args.val_annotations:
             validation_generator = CSVGenerator(
