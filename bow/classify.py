@@ -10,13 +10,21 @@ import csv
 sift = cv2.xfeatures2d.SIFT_create()
 surf = cv2.xfeatures2d.SURF_create()
 
-test_data_set_path = "../AID_test/"
+# test_data_set_path = "../AID_test/"
+test_data_set_csv = "../AID_DIVISION/test.csv"
 _RESULTS_DIR = "Results/"
 _COMPARISON_RESULTS_FILENAME = "comparison_results.csv"
 _SUMMARY_RESULTS_FILENAME = "summary_results.csv"
 
 
-def main():
+def read_csv(csv_filepath):
+    with open(csv_filepath, newline='') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        for row in csv_reader:
+            yield row[0], row[1]
+
+
+def classify():
     makedirs(_RESULTS_DIR, exist_ok=True)
     comparison_results_filepath = path.join(_RESULTS_DIR, _COMPARISON_RESULTS_FILENAME)
 
@@ -37,22 +45,18 @@ def main():
     des_list = []
     imgs_ref_labels = []
     num_total_images = 0
-    for label_folder in listdir(test_data_set_path):
-        label_folder_path = path.join(test_data_set_path, label_folder)
-
-        for image_file in listdir(label_folder_path):
-            image_path = path.join(label_folder_path, image_file)
-            print("read and extracting descriptors: ", image_path)
-            # reading image in rgb
-            im = cv2.imread(image_path)
-            # extracting features
-            kpts, des = surf.detectAndCompute(im, None)
-            if des is not None:
-                imgs_ref_labels += [label_folder];
-                des_list.append((image_path, des))
-                num_total_images += 1
-            else:
-                print("Error extracting the descriptor: ", image_path)
+    for path_img, lab in read_csv(test_data_set_csv):
+        print("Extracting descriptors: ", path_img)
+        # reading image in rgb
+        im = cv2.imread(path_img)
+        # extracting features
+        kpts, des = surf.detectAndCompute(im, None)
+        if des is not None:
+            des_list.append((path_img, des))
+            imgs_ref_labels.append(lab)
+            num_total_images += 1
+        else:
+            print("Error extracting the descriptor: ", path_img)
 
     # making the histogram with all the words
     print("Extracting histogram...")
@@ -99,4 +103,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    classify()

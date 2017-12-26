@@ -3,6 +3,7 @@ from sklearn.externals import joblib
 from sklearn import svm
 from scipy.cluster.vq import vq, kmeans
 from os import listdir, path
+import csv
 import numpy as np
 import cv2
 
@@ -11,35 +12,42 @@ sift = cv2.xfeatures2d.SIFT_create()
 surf = cv2.xfeatures2d.SURF_create()
 
 # path to aid folder
-train_data_set_path = "../AID/"
+# train_data_set_path = "../AID/"
+train_data_set_csv = "../AID_DIVISION/train.csv"
 
 
-def main():
+def read_csv(csv_filepath):
+    with open(csv_filepath, newline='') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        for row in csv_reader:
+            yield row[0], row[1]
+
+def train():
     # get all the folders inside the aid folder(classes)
-    possible_labels_folders = listdir(train_data_set_path)
+    # possible_labels_folders = listdir(train_data_set_path)
 
     des_list = []
     num_total_images = 0
+    possible_labels_folders = []
     image_label_list = []
-    label = 0
-    for label_folder in possible_labels_folders:
-        label_folder_path = path.join(train_data_set_path, label_folder)
+    label_id = -1
 
-        # for all files in image folder(class)
-        for image_file in listdir(label_folder_path):
-            image_path = path.join(label_folder_path, image_file)
-            print("Extracting descriptors (", label, "/", len(possible_labels_folders), "): ", image_path)
-            # reading image in rgb
-            im = cv2.imread(image_path)
-            # extracting features
-            kpts, des = surf.detectAndCompute(im, None)
-            if des is not None:
-                des_list.append(des)
-                image_label_list += [label]
-                num_total_images += 1
-            else:
-                print("Error extracting the descriptor: ", image_path)
-        label += 1
+    for path_img, lab in read_csv(train_data_set_csv):
+        # print("Extracting descriptors: ", path_img)
+        # reading image in rgb
+        im = cv2.imread(path_img)
+        # extracting features
+        kpts, des = surf.detectAndCompute(im, None)
+        if des is not None:
+            if lab not in possible_labels_folders:
+                label_id += 1
+                print("Changing label (",lab," - ", label_id, "): ", path_img)
+                possible_labels_folders.append(lab)
+            des_list.append(des)
+            num_total_images += 1
+            image_label_list.append(label_id)
+        else:
+            print("Error extracting the descriptor: ", path_img)
 
     # using vstack to stack all the descriptors in one big numpy array to feed kmeans
     features = des_list[0]
@@ -80,4 +88,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    train()
