@@ -8,10 +8,7 @@ LEARNING_CLASS_FILENAME = "learning_class.csv"
 TESTING_FILENAME = "testing.csv"
 
 
-def build_csvs_if_none(dataset_dirpath, csv_data):
-
-    if not os.path.isdir(dataset_dirpath):
-        raise Exception(f"{dataset_dirpath} is not a directory")
+def build_csvs_if_none(dataset_conf, csv_data):
 
     os.makedirs(csv_data.dirpath, exist_ok=True)
 
@@ -21,38 +18,53 @@ def build_csvs_if_none(dataset_dirpath, csv_data):
                                            LEARNING_CLASS_FILENAME)
     testing_filepath = os.path.join(csv_data.dirpath, TESTING_FILENAME)
 
-    if (not (os.path.isfile(learning_annotations_filepath)
-             and os.path.isfile(learning_class_filepath)
-             and os.path.isfile(testing_filepath))):
-        with open(learning_annotations_filepath,
-                  "w") as learning_annotations_file, open(
-                      learning_class_filepath,
-                      "w") as learning_class_file, open(testing_filepath,
-                                                        "w") as testing_file:
-            learning_annotations_writer = csv.writer(learning_annotations_file)
-            learning_class_writer = csv.writer(learning_class_file)
-            testing_writer = csv.writer(testing_file)
-            category_id = 0
-            for root, _, files in os.walk(dataset_dirpath):
-                if not files or os.path.normpath(
-                        dataset_dirpath) == os.path.normpath(root):
-                    continue
-                category = os.path.basename(root).lower()
-                learning_class_writer.writerow([category, category_id])
-                for i, fn in enumerate(files):
-                    fp = os.path.join(root, fn)
-                    image_info = Image.open(fp)
-                    image_width, image_height = image_info.size
-                    if i < csv_data.annotations_per_category:
-                        learning_annotations_writer.writerow([
-                            fp, 0, 0, image_height - 1, image_width - 1,
-                            category
-                        ])
-                        i += 1
-                    else:
-                        testing_writer.writerow([fp, category])
-                category_id += 1
-    else:
+    if (os.path.isfile(learning_annotations_filepath)
+            and os.path.isfile(learning_class_filepath)
+            and os.path.isfile(testing_filepath)):
         print("csv data files present skipping...", file=sys.stderr)
+        return
 
-    return learning_annotations_filepath, learning_class_filepath, testing_filepath
+    if not (os.path.isfile(dataset_conf.train_csv_filepath)
+            and os.path.isfile(dataset_conf.test_csv_filepath)
+            and os.path.isfile(dataset_conf.labels_csv_filepath)):
+        raise Exception(f"dataset csvs do not exist")
+
+    with open(learning_annotations_filepath,
+              "w") as learning_annotations_file, open(
+                  learning_class_filepath, "w") as learning_class_file, open(
+                      testing_filepath, "w") as testing_file:
+        learning_annotations_writer = csv.writer(learning_annotations_file)
+        testing_writer = csv.writer(testing_file)
+        learning_class_writer = csv.writer(learning_class_file)
+
+        train_iterator = _read_csv(dataset_conf.train_csv_filepath)
+
+        for image_path, image_label in train_iterator:
+            image_width, image_height = _get_image_size(image_path)
+            learning_annotations_writer.writerow([
+                image_path, 0, 0, image_height - 1, image_width - 1,
+                image_label
+            ])
+
+        test_iterator = _read_csv(dataset_conf.test_csv_filepath)
+
+        for image_path, image_label in test_iterator:
+            image_width, image_height = _get_image_size(image_path)
+            testing_writer.writerow([image_path, image_label])
+
+        labels_iterator = _read_csv(dataset_conf.labels_csv_filepath)
+
+        for i, image_class in enumerate(labels_iterator):
+            learning_class_writer.writerow([image_class[0], i])
+
+
+def _get_image_size(image_path):
+    image_info = Image.open(image_path)
+    return image_info.size
+
+
+def _read_csv(csv_filepath):
+    with open(csv_filepath, newline='') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        for row in csv_reader:
+            yield row

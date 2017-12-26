@@ -358,4 +358,4 @@ def _read_csv(csv_filepath):
     with open(csv_filepath, newline='') as csv_file:
         csv_reader = csv.reader(csv_file)
         for row in csv_reader:
-            yield row[0], row[1]
+            yield row
