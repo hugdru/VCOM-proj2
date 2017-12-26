@@ -15,6 +15,12 @@ def create_csvs():
     train_csv_filepath = path.join(SPLIT_AID_FOLDER, TRAIN_CSV_FILENAME)
     test_csv_filepath = path.join(SPLIT_AID_FOLDER, TEST_CSV_FILENAME)
 
+    exists_train_csv = path.isfile(train_csv_filepath)
+    exists_test_csv = path.isfile(test_csv_filepath)
+
+    if exists_train_csv and exists_test_csv:
+        return
+
     with open(train_csv_filepath, "w") as train_file, open(
             test_csv_filepath, "w") as test_file:
 
