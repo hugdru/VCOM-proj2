@@ -1,8 +1,9 @@
 from sklearn.externals import joblib
 from sklearn import svm
-from os import makedirs, listdir, path
+from os import makedirs, path, remove
 from scipy.cluster.vq import vq
 import numpy as np
+import h5py
 import cv2
 import csv
 
@@ -11,11 +12,12 @@ sift = cv2.xfeatures2d.SIFT_create()
 surf = cv2.xfeatures2d.SURF_create()
 
 # test_data_set_path = "../AID_test/"
-test_data_set_csv = "../AID_DIVISION/test.csv"
+_TEST_DATA_SET_CSV = "../AID_DIVISION/test.csv"
 _RESULTS_DIR = "Results/"
 _COMPARISON_RESULTS_FILENAME = "comparison_results.csv"
 _SUMMARY_RESULTS_FILENAME = "summary_results.csv"
 
+_TEMP_DESC_FILE = "descriptors_classify.h5py"
 
 def read_csv(csv_filepath):
     with open(csv_filepath, newline='') as csv_file:
@@ -41,30 +43,34 @@ def classify():
     print("Loading data in bow.pkl")
     labels, centroid_codebook, clf, stdScaler = joblib.load("bow.pkl")
 
+    descriptor_file_save = h5py.File(_TEMP_DESC_FILE, "w")
+
     # List where all the descriptors are stored
-    des_list = []
     imgs_ref_labels = []
     num_total_images = 0
-    for path_img, lab in read_csv(test_data_set_csv):
+    for path_img, lab in read_csv(_TEST_DATA_SET_CSV):
         print("Extracting descriptors: ", path_img)
         # reading image in rgb
         im = cv2.imread(path_img)
         # extracting features
         kpts, des = surf.detectAndCompute(im, None)
         if des is not None:
-            des_list.append((path_img, des))
+            descriptor_file_save.create_dataset(str(num_total_images), data=des)
             imgs_ref_labels.append(lab)
             num_total_images += 1
         else:
             print("Error extracting the descriptor: ", path_img)
+    descriptor_file_save.close()
 
+    descriptor_file_load = h5py.File(_TEMP_DESC_FILE, "r")
     # making the histogram with all the words
     print("Extracting histogram...")
     histogram_with_features = np.zeros((num_total_images, len(centroid_codebook)), 'float32')
-    for i in range(num_total_images):
-        words, dist = vq(des_list[i][1], centroid_codebook)
+    for row_id in range(num_total_images):
+        words, dist = vq(descriptor_file_load.get(str(row_id)), centroid_codebook)
         for w in words:
-            histogram_with_features[i][w] += 1
+            histogram_with_features[row_id][w] += 1
+    descriptor_file_load.close()
 
     # Scale words in the histogram
     print("scale histogram...")
@@ -88,7 +94,7 @@ def classify():
         matches = 0
         total = 0
 
-        all_the_images_tested = [str(img[0]) for img in des_list]
+        all_the_images_tested = [str(p) for p, _ in read_csv(_TEST_DATA_SET_CSV)]
         for i in range(num_total_images):
             comparison_results_writer.writerow([
                 all_the_images_tested[i], imgs_ref_labels[i], predictions[i]
@@ -100,6 +106,7 @@ def classify():
 
         summary_results_writer.writerow(
             ["match percentage", matches / total * 100])
+    remove(_TEMP_DESC_FILE)
 
 
 if __name__ == "__main__":
