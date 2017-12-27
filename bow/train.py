@@ -9,8 +9,9 @@ import cv2
 import h5py
 
 # Create sift for feature extraction
-sift = cv2.xfeatures2d.SIFT_create()
-surf = cv2.xfeatures2d.SURF_create()
+# cv2.xfeatures2d.SURF_create()
+SIFT_SURF = cv2.xfeatures2d.SIFT_create()
+STACK_COLS = 128
 
 # path to aid folder
 _TRAIN_DATA_SET_SCV = "../AID_DIVISION/train.csv"
@@ -39,7 +40,7 @@ def train():
         # reading image in rgb
         im = cv2.imread(path_img)
         # extracting features
-        kpts, des = surf.detectAndCompute(im, None)
+        kpts, des = SIFT_SURF.detectAndCompute(im, None)
         if des is not None:
             if lab not in possible_labels_folders:
                 label_id += 1
@@ -56,20 +57,20 @@ def train():
 
     descriptor_file_load = h5py.File(_TEMP_DESC_FILE, "r")
 
-    surf_cols = 64
     stacking_descriptor_save = h5py.File(_TEMP_DESC_STACK_FILE, 'w')
     stack = stacking_descriptor_save.create_dataset('stack_kmeans',
-                                                    (num_rows_des, surf_cols), maxshape=(None, None))
+                                                    (num_rows_des, STACK_COLS), maxshape=(None, None))
     row_pointer = 0
     for row_id in range(num_total_images):
         desc = descriptor_file_load.get(str(row_id))
         size_desc = len(desc)
         end_value = row_pointer + len(desc)
         print(row_id, " - ", size_desc, " -> ", row_pointer, "/", end_value, "/", num_rows_des)
-        stack[row_pointer:end_value, 0:surf_cols] = desc
+        stack[row_pointer:end_value, 0:STACK_COLS] = desc
         row_pointer = end_value
 
     stacking_descriptor_save.close()
+    descriptor_file_load.close()
 
     stacking_descriptor_load = h5py.File(_TEMP_DESC_STACK_FILE, "r")
     features = stacking_descriptor_load.get('stack_kmeans')
@@ -84,6 +85,7 @@ def train():
 
     # making the histogram with all the words (visual vocabulary)
     print("extracting histogram...")
+    descriptor_file_load = h5py.File(_TEMP_DESC_FILE, "r")
     histogram_with_features = np.zeros((num_total_images, len(centroid_codebook)), 'float32')
     for row_id in range(num_total_images):
         desc = descriptor_file_load.get(str(row_id))

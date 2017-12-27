@@ -8,8 +8,8 @@ import cv2
 import csv
 
 # Create sift for feature extraction
-sift = cv2.xfeatures2d.SIFT_create()
-surf = cv2.xfeatures2d.SURF_create()
+# cv2.xfeatures2d.SURF_create()
+SIFT_SURF = cv2.xfeatures2d.SIFT_create()
 
 # test_data_set_path = "../AID_test/"
 _TEST_DATA_SET_CSV = "../AID_DIVISION/test.csv"
@@ -53,7 +53,7 @@ def classify():
         # reading image in rgb
         im = cv2.imread(path_img)
         # extracting features
-        kpts, des = surf.detectAndCompute(im, None)
+        kpts, des = SIFT_SURF.detectAndCompute(im, None)
         if des is not None:
             descriptor_file_save.create_dataset(str(num_total_images), data=des)
             imgs_ref_labels.append(lab)
