@@ -258,6 +258,8 @@ def main(args=None):
         args = sys.argv[1:]
     args = parse_args(args)
 
+    os.makedirs(args.snapshot_path, exist_ok=True)
+
     # make sure keras is the minimum required version
     check_keras_version()
 
