@@ -5,6 +5,7 @@ ENV_FOLDER="$SCRIPT_DIR/env"
 CODE_FOLDER="$SCRIPT_DIR/cnn"
 CSV_MAIN_FILE="$CODE_FOLDER/csv_gen.py"
 TRAIN_MAIN_FILE="$CODE_FOLDER/train.py"
+CLASSIFY_MAIN_FILE="$CODE_FOLDER/classify.py"
 TEST_FOLDER="$SCRIPT_DIR/test"
 REQUIREMENTS_FOLDER="$SCRIPT_DIR/requirements"
 
@@ -43,7 +44,7 @@ main() {
 
   local subcommand="$1"
   case "$subcommand" in
-    csv_gen|train|env|test)
+    csv_gen|train|classify|env|test)
       sc_"$subcommand" "${@:2}"
       ;;
     *)
@@ -112,16 +113,21 @@ env_args() {
 }
 
 sc_csv_gen() {
-  sc_csv_train_common "$@"
+  sc_env_common "$@"
   python "$CSV_MAIN_FILE" "${_APP_ARGS_ARRAY[@]}"
 }
 
 sc_train() {
-  sc_csv_train_common "$@"
+  sc_env_common "$@"
   python "$TRAIN_MAIN_FILE" "${_APP_ARGS_ARRAY[@]}"
 }
 
-sc_csv_train_common() {
+sc_classify() {
+  sc_env_common "$@"
+  python "$CLASSIFY_MAIN_FILE" "${_APP_ARGS_ARRAY[@]}"
+}
+
+sc_env_common() {
   args_separator "$@"
   env_args "${_SB_ARGS_ARRAY[@]}"
   sc_env "${_ENV_ARGS_ARRAY[@]}"
@@ -168,7 +174,7 @@ usage() {
   local bail="$1"
 
   read -r -d '' usage_string <<EOF
-[BUILD=""] $0 csv_gen [[-f] [-- ..app_arguments]] | train [[-f] [-- ..app_arguments]] | env [-f]
+[BUILD=""] $0 (csv_gen | train | classify) [-f] [-- ..app_arguments] | env [-f]
  csv   # generates the csv files for fizyr/keras-retinanet
   -f              # forces env recreation and installs the requirements
   --              # separates run arguments from app arguments
@@ -178,6 +184,14 @@ usage() {
 
 
  train   # calls the train script for fizyr/keras-retinanet
+  -f              # forces env recreation and installs the requirements
+  --              # separates run arguments from app arguments
+  ..app_arguments # the arguments to pass to the app
+
+  default: only creates env if it does not exist does not pass arguments to the app
+
+
+ classify   # classifies the test images and external images
   -f              # forces env recreation and installs the requirements
   --              # separates run arguments from app arguments
   ..app_arguments # the arguments to pass to the app
