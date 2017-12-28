@@ -20,6 +20,8 @@ BASE_DIR = "./"
 SNAPSHOT_DIR = "snapshots/"
 # SNAPSHOT_FILE = SNAPSHOT_DIR + "resnet50_csv_50.h5"
 SNAPSHOT_FILE = None
+RESULTS_DIR = "results/"
+VISUALIZE_RESULTS = True
 
 
 def get_session():
@@ -29,6 +31,9 @@ def get_session():
 
 
 def main():
+
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+
     # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     keras.backend.tensorflow_backend.set_session(get_session())
 
@@ -59,61 +64,71 @@ def main():
         batch_size=BATCH_SIZE,
         base_dir=BASE_DIR)
 
-    index = 0
+    for image_index in range(val_generator.size()):
 
-    # load image
-    image = val_generator.load_image(index)
+        # load image
+        image = val_generator.load_image(image_index)
 
-    # copy to draw on
-    draw = image.copy()
-    draw = cv2.cvtColor(draw, cv2.COLOR_BGR2RGB)
+        # copy to draw on
+        draw = image.copy()
+        draw = cv2.cvtColor(draw, cv2.COLOR_BGR2RGB)
 
-    # preprocess image for network
-    image = val_generator.preprocess_image(image)
-    image, scale = val_generator.resize_image(image)
-    annotations = val_generator.load_annotations(index)
-    index += 1
+        # preprocess image for network
+        image = val_generator.preprocess_image(image)
+        image, scale = val_generator.resize_image(image)
+        annotations = val_generator.load_annotations(image_index)
 
-    # process image
-    start = time.time()
-    _, _, detections = model.predict_on_batch(np.expand_dims(image, axis=0))
-    print("processing time: ", time.time() - start)
+        # process image
+        start = time.time()
+        _, _, detections = model.predict_on_batch(
+            np.expand_dims(image, axis=0))
+        print("processing time: ", time.time() - start)
 
-    # compute predicted labels and scores
-    predicted_labels = np.argmax(detections[0, :, 4:], axis=1)
-    scores = detections[0,
-                        np.arange(detections.shape[1]), 4 + predicted_labels]
+        # compute predicted labels and scores
+        predicted_labels = np.argmax(detections[0, :, 4:], axis=1)
+        scores = detections[
+            0, np.arange(detections.shape[1]), 4 + predicted_labels]
 
-    # correct for image scale
-    detections[0, :, :4] /= scale
+        # correct for image scale
+        detections[0, :, :4] /= scale
 
-    # visualize detections
-    for idx, (label, score) in enumerate(zip(predicted_labels, scores)):
-        if score < 0.5:
-            continue
-        b = detections[0, idx, :4].astype(int)
-        cv2.rectangle(draw, (b[0], b[1]), (b[2], b[3]), (0, 0, 255), 3)
-        caption = "{} {:.3f}".format(val_generator.label_to_name(label), score)
-        cv2.putText(draw, caption, (b[0], b[1] - 10), cv2.FONT_HERSHEY_PLAIN,
-                    1.5, (0, 0, 0), 3)
-        cv2.putText(draw, caption, (b[0], b[1] - 10), cv2.FONT_HERSHEY_PLAIN,
-                    1.5, (255, 255, 255), 2)
+        # visualize detections
+        detected = False
+        for idx, (label, score) in enumerate(zip(predicted_labels, scores)):
+            if score < 0.5:
+                continue
 
-    # visualize annotations
-    for annotation in annotations:
-        label = int(annotation[4])
-        b = annotation[:4].astype(int)
-        cv2.rectangle(draw, (b[0], b[1]), (b[2], b[3]), (0, 255, 0), 2)
-        caption = "{}".format(val_generator.label_to_name(label))
-        cv2.putText(draw, caption, (b[0], b[1] - 10), cv2.FONT_HERSHEY_PLAIN,
-                    1.5, (0, 0, 0), 3)
-        cv2.putText(draw, caption, (b[0], b[1] - 10), cv2.FONT_HERSHEY_PLAIN,
-                    1.5, (255, 255, 255), 2)
+            detected = True
 
-    plt.figure(figsize=(15, 15))
-    plt.axis('off')
-    plt.imshow(draw)
-    plt.show()
+            if VISUALIZE_RESULTS:
+
+                b = detections[0, idx, :4].astype(int)
+                cv2.rectangle(draw, (b[0], b[1]), (b[2], b[3]), (0, 0, 255), 3)
+                caption = "{} {:.3f}".format(
+                    val_generator.label_to_name(label), score)
+                cv2.putText(draw, caption, (b[0], b[1] - 10),
+                            cv2.FONT_HERSHEY_PLAIN, 1.5, (0, 0, 0), 3)
+                cv2.putText(draw, caption, (b[0], b[1] - 10),
+                            cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 255, 255), 2)
+
+        if VISUALIZE_RESULTS and detected:
+
+            # visualize annotations
+            for annotation in annotations:
+
+                label = int(annotation[4])
+                b = annotation[:4].astype(int)
+                cv2.rectangle(draw, (b[0], b[1]), (b[2], b[3]), (0, 255, 0), 2)
+                caption = "{}".format(val_generator.label_to_name(label))
+                cv2.putText(draw, caption, (b[0], b[1] - 10),
+                            cv2.FONT_HERSHEY_PLAIN, 1.5, (0, 0, 0), 3)
+                cv2.putText(draw, caption, (b[0], b[1] - 10),
+                            cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 255, 255), 2)
+
+            plt.figure(figsize=(15, 15))
+            plt.axis('off')
+            plt.imshow(draw)
+            plt.show()
 
 
 if __name__ == "__main__":
