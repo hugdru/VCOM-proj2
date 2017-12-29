@@ -60,9 +60,8 @@ def main():
     with open(confusion_matrix_filepath, "w") as confusion_matrix_file:
         confusion_matrix_writer = csv.writer(confusion_matrix_file)
         confusion_matrix_writer.writerow([""] + classes_with_insertion_order)
-        for i, class_order in enumerate(classes_with_insertion_order):
-            confusion_matrix_writer.writerow(
-                [class_order] + confusion_matrix[i])
+        for i, class_ in enumerate(classes_with_insertion_order):
+            confusion_matrix_writer.writerow([class_] + confusion_matrix[i])
 
 
 def read_csv(csv_filepath):
