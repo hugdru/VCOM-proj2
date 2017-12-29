@@ -17,11 +17,7 @@ fi
 PYTHON="${PYTHON_PATH##*/}"
 PYTHON_VERSION="$("$PYTHON" --version | awk '{print $2}')"
 
-REQUIREMENTS=(dev cpu)
-if [[ -n "$BUILD" ]]; then
-  IFS=' ' read -r -a REQUIREMENTS <<< "$BUILD"
-fi
-REQUIREMENTS=(common "${REQUIREMENTS[@]}" external)
+REQUIREMENTS=(common external dev)
 
 # _.* variables are used for function returns.
 # Bash does not have "typical" return values only return codes
@@ -174,7 +170,7 @@ usage() {
   local bail="$1"
 
   read -r -d '' usage_string <<EOF
-[BUILD=""] $0 (csv_gen | train | classify) [-f] [-- ..app_arguments] | env [-f]
+$0 (csv_gen | train | classify) [-f] [-- ..app_arguments] | env [-f]
  csv   # generates the csv files for fizyr/keras-retinanet
   -f              # forces env recreation and installs the requirements
   --              # separates run arguments from app arguments
@@ -203,17 +199,6 @@ usage() {
   -f              # forces env recreation and installs the requirements
 
   default: only creates env if it does not exist
-
-
- BUILD # environment variable to choose the requirements to install separated by spaces, files in requirements
-  common          # packages shared by all, it is added by default
-  cpu             # tensor flow cpu
-  gpu             # tensor flow gpu
-  dev             # packages required for development linters, testing, etc
-  external        # dependencies on remote git repositories
-  ...             # check the requirements folder for the .txt files
-
-  default: BUILD="dev cpu external"
 EOF
 
   log_message -e "$usage_string"
