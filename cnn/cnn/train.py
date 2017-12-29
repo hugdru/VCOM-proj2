@@ -160,7 +160,8 @@ def create_generators(args):
                 args.val_annotations,
                 args.classes,
                 val_image_data_generator,
-                batch_size=args.batch_size)
+                batch_size=args.batch_size,
+                base_dir="./")
         else:
             validation_generator = None
     else:
